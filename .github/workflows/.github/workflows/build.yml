@@ -1,7 +1,7 @@
 name: Build Android AAR
 
 on:
-  workflow_dispatch: # 开启手动点击运行的开关
+  workflow_dispatch: 
 
 jobs:
   build:
@@ -13,38 +13,45 @@ jobs:
       - name: 2. 设置 Go 环境
         uses: actions/setup-go@v5
         with:
-          go-version: '1.25.x' # 匹配你的 1.25 环境
+          go-version: '1.25.x'
 
-      - name: 3. 设置 Android 环境
+      - name: 3. 设置 Android NDK
         uses: android-actions/setup-android@v3
         with:
-          ndk-version: '26.1.10909125' # 稳定的 NDK 版本
+          ndk-version: '26.1.10909125'
 
-      - name: 4. 安装打包工具
+      - name: 4. 强力注入依赖 (解决 bind 报错的关键)
         run: |
           go env -w GOPROXY=https://goproxy.cn,direct
+          # 1. 强行把 mobile 包拉到本地缓存
+          go get golang.org/x/mobile/bind@latest
+          go mod download golang.org/x/mobile
+          
+          # 2. 安装并同步工具版本
           go install golang.org/x/mobile/cmd/gomobile@latest
           go install golang.org/x/mobile/cmd/gobind@latest
-          # 将工具添加到系统路径，防止找不到命令
+          
+          # 3. 将工具路径加入系统
           echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
-
-      - name: 5. 整理依赖
-        run: |
-          # 强制让 Go 识别仓库里所有的 adapter 和 common 文件夹
+          
+          # 4. 强制整理一次依赖，确保零件都齐了
           go mod tidy
 
-      - name: 6. 正式打包 AAR
+      - name: 5. 初始化工具链
+        run: |
+          # 必须用绝对路径初始化，确保环境干净
+          $(go env GOPATH)/bin/gomobile init
+
+      - name: 6. 正式打包 AAR (带调试参数)
         env:
           CGO_ENABLED: 1
         run: |
-          # 初始化 gomobile
-          gomobile init
-          # 执行打包：针对你的 libbox 文件夹
-          # -v 是为了让你在日志里看到进度
-          # -androidapi 21 保证了兼容性
-          gomobile bind -v -androidapi 21 -target=android ./experimental/libbox
+          # 我们不再 cd 进去，直接从根目录通过路径打包，防止上下文丢失
+          # 加上 -x 可以看到它底层到底在找哪个路径
+          gomobile bind -v -x -androidapi 21 -target=android ./experimental/libbox
 
       - name: 7. 上传成品
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: libbox-aar
