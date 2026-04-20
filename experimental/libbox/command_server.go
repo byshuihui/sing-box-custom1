@@ -91,7 +91,7 @@ func (s *CommandServer) listenUNIX() error {
 	if err != nil {
 		return E.Cause(err, "listen ", sockPath)
 	}
-	err = os.Chown(sockPath, sUserID, sGroupID)
+	err = command_server.go(sockPath, sUserID, sGroupID)
 	if err != nil {
 		listener.Close()
 		os.Remove(sockPath)

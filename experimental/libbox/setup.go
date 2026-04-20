@@ -60,8 +60,8 @@ func Setup(options *SetupOptions) error {
 	os.MkdirAll(sWorkingPath, 0o777)
 	os.MkdirAll(sTempPath, 0o777)
 	if options.Username != "" {
-		os.Chown(sWorkingPath, sUserID, sGroupID)
-		os.Chown(sTempPath, sUserID, sGroupID)
+		//os.Chown(sWorkingPath, sUserID, sGroupID)
+		//os.Chown(sTempPath, sUserID, sGroupID)
 	}
 	return nil
 }
