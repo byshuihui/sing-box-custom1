@@ -1,0 +1,51 @@
+name: Build Android AAR
+
+on:
+  workflow_dispatch: # 开启手动点击运行的开关
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 1. 检出代码
+        uses: actions/checkout@v4
+
+      - name: 2. 设置 Go 环境
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.x' # 匹配你的 1.25 环境
+
+      - name: 3. 设置 Android 环境
+        uses: android-actions/setup-android@v3
+        with:
+          ndk-version: '26.1.10909125' # 稳定的 NDK 版本
+
+      - name: 4. 安装打包工具
+        run: |
+          go env -w GOPROXY=https://goproxy.cn,direct
+          go install golang.org/x/mobile/cmd/gomobile@latest
+          go install golang.org/x/mobile/cmd/gobind@latest
+          # 将工具添加到系统路径，防止找不到命令
+          echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
+
+      - name: 5. 整理依赖
+        run: |
+          # 强制让 Go 识别仓库里所有的 adapter 和 common 文件夹
+          go mod tidy
+
+      - name: 6. 正式打包 AAR
+        env:
+          CGO_ENABLED: 1
+        run: |
+          # 初始化 gomobile
+          gomobile init
+          # 执行打包：针对你的 libbox 文件夹
+          # -v 是为了让你在日志里看到进度
+          # -androidapi 21 保证了兼容性
+          gomobile bind -v -androidapi 21 -target=android ./experimental/libbox
+
+      - name: 7. 上传成品
+        uses: actions/upload-artifact@v4
+        with:
+          name: libbox-aar
+          path: ./*.aar
